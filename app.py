@@ -43,20 +43,17 @@ class GeeTestIdentifier:
 
 app = Flask(__name__)
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['POST'])
 def process_images():
-    bg_url = request.args.get('bg_url')
-    puzzle_url = request.args.get('puzzle_url')
-    
-    if not bg_url or not puzzle_url:
-        return jsonify({"error": "Missing 'bg_url' or 'puzzle_url' query parameters. Please use the /?bg_url=<URL>&puzzle_url=<URL> format."}), 400
+    data = request.get_json()
+    if not data or 'bg_image' not in data or 'puzzle_image' not in data:
+        return jsonify({"error": "Invalid JSON payload. Missing 'bg_image' or 'puzzle_image'."}), 400
     
     try:
-        bg_response = requests.get(bg_url, timeout=10)
-        puzzle_response = requests.get(puzzle_url, timeout=10)
-        bg_response.raise_for_status()
-        puzzle_response.raise_for_status()
-        identifier = GeeTestIdentifier(background=bg_response.content, puzzle_piece=puzzle_response.content, debugger=True)
+        bg_image_data = base64.b64decode(data['bg_image'])
+        puzzle_image_data = base64.b64decode(data['puzzle_image'])
+        
+        identifier = GeeTestIdentifier(background=bg_image_data, puzzle_piece=puzzle_image_data, debugger=True)
         result = identifier.find_puzzle_piece_position()
         return jsonify(result)
     except Exception as e:
