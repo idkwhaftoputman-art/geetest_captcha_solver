@@ -1,8 +1,5 @@
 import cv2
 import numpy as np
-import io
-import requests
-import json
 import base64
 import os
 from flask import Flask, request, jsonify
@@ -12,7 +9,7 @@ class GeeTestIdentifier:
         self.background = self._read_image(background)
         self.puzzle_piece = self._read_image(puzzle_piece)
         self.debugger = debugger
-    
+
     @staticmethod
     def _read_image(image_source):
         return cv2.imdecode(np.frombuffer(image_source, np.uint8), cv2.IMREAD_ANYCOLOR)
@@ -20,9 +17,7 @@ class GeeTestIdentifier:
     def find_puzzle_piece_position(self):
         edge_puzzle_piece = cv2.Canny(self.puzzle_piece, 100, 200)
         edge_background = cv2.Canny(self.background, 100, 200)
-        edge_puzzle_piece_rgb = cv2.cvtColor(edge_puzzle_piece, cv2.COLOR_GRAY2RGB)
-        edge_background_rgb = cv2.cvtColor(edge_background, cv2.COLOR_GRAY2RGB)
-        res = cv2.matchTemplate(edge_background_rgb, edge_puzzle_piece_rgb, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(edge_background, edge_puzzle_piece, cv2.TM_CCOEFF_NORMED)
         _, _, _, max_loc = cv2.minMaxLoc(res)
         top_left = max_loc
         h, w = edge_puzzle_piece.shape[:2]
@@ -48,11 +43,9 @@ def process_images():
     data = request.get_json()
     if not data or 'bg_image' not in data or 'puzzle_image' not in data:
         return jsonify({"error": "Invalid JSON payload. Missing 'bg_image' or 'puzzle_image'."}), 400
-    
     try:
         bg_image_data = base64.b64decode(data['bg_image'])
         puzzle_image_data = base64.b64decode(data['puzzle_image'])
-        
         identifier = GeeTestIdentifier(background=bg_image_data, puzzle_piece=puzzle_image_data, debugger=True)
         result = identifier.find_puzzle_piece_position()
         return jsonify(result)
