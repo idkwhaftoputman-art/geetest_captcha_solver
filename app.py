@@ -8,14 +8,14 @@ import os
 from flask import Flask, request, jsonify
 
 class GeeTestIdentifier:
-    def __init__(self, background_data, puzzle_piece_data, debugger=False):
-        self.background = self._read_image(background_data)
-        self.puzzle_piece = self._read_image(puzzle_piece_data)
+    def __init__(self, background, puzzle_piece, debugger=False):
+        self.background = self._read_image(background)
+        self.puzzle_piece = self._read_image(puzzle_piece)
         self.debugger = debugger
     
     @staticmethod
-    def _read_image(image_data):
-        return cv2.imdecode(np.frombuffer(base64.b64decode(image_data), np.uint8), cv2.IMREAD_ANYCOLOR)
+    def _read_image(image_source):
+        return cv2.imdecode(np.frombuffer(image_source, np.uint8), cv2.IMREAD_ANYCOLOR)
 
     def find_puzzle_piece_position(self):
         edge_puzzle_piece = cv2.Canny(self.puzzle_piece, 100, 200)
@@ -31,35 +31,32 @@ class GeeTestIdentifier:
         center_y = top_left[1] + h // 2
         position_from_left = center_x
         position_from_bottom = self.background.shape[0] - center_y
-        
         if self.debugger:
             cv2.rectangle(self.background, top_left, bottom_right, (0, 0, 255), 2)
-            cv2.line(self.background, (0, center_y), (self.background.shape[1], center_y), (0, 0, 255), 2)
-            cv2.line(self.background, (center_x, 0), (center_x, self.background.shape[0]), (0, 0, 255), 2)
-        
         _, buffer = cv2.imencode('.png', self.background)
         encoded_image = base64.b64encode(buffer).decode('utf-8')
-        
         return {
             "output_image_data": f"data:image/png;base64,{encoded_image}"
         }
 
 app = Flask(__name__)
 
-@app.route('/', methods=['POST'])
-def process_images_post():
+@app.route('/', methods=['GET'])
+def process_images():
+    bg_url = request.args.get('bg_url')
+    puzzle_url = request.args.get('puzzle_url')
+    
+    if not bg_url or not puzzle_url:
+        return jsonify({"error": "Missing 'bg_url' or 'puzzle_url' query parameters. Please use the /?bg_url=<URL>&puzzle_url=<URL> format."}), 400
+    
     try:
-        data = request.json
-        bg_image_data = data.get('bg_image')
-        puzzle_image_data = data.get('puzzle_image')
-        
-        if not bg_image_data or not puzzle_image_data:
-            return jsonify({"error": "Missing 'bg_image' or 'puzzle_image' in JSON payload."}), 400
-        
-        identifier = GeeTestIdentifier(background_data=bg_image_data, puzzle_piece_data=puzzle_image_data, debugger=True)
+        bg_response = requests.get(bg_url, timeout=10)
+        puzzle_response = requests.get(puzzle_url, timeout=10)
+        bg_response.raise_for_status()
+        puzzle_response.raise_for_status()
+        identifier = GeeTestIdentifier(background=bg_response.content, puzzle_piece=puzzle_response.content, debugger=True)
         result = identifier.find_puzzle_piece_position()
         return jsonify(result)
-        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
