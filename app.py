@@ -33,6 +33,8 @@ class GeeTestIdentifier:
         position_from_bottom = self.background.shape[0] - center_y
         if self.debugger:
             cv2.rectangle(self.background, top_left, bottom_right, (0, 0, 255), 2)
+            cv2.line(self.background, (0, center_y), (self.background.shape[1], center_y), (0, 0, 255), 2)
+            cv2.line(self.background, (center_x, 0), (center_x, self.background.shape[0]), (0, 0, 255), 2)
         _, buffer = cv2.imencode('.png', self.background)
         encoded_image = base64.b64encode(buffer).decode('utf-8')
         return {
